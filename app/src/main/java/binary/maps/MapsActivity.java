@@ -1,11 +1,11 @@
 package binary.maps;
 
 import android.Manifest;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
-import android.location.LocationManager;
 import android.speech.tts.TextToSpeech;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -19,6 +19,7 @@ import android.support.v7.widget.RecyclerView;
 import android.text.Html;
 import android.util.Log;
 import android.view.View;
+import android.widget.ImageButton;
 import android.widget.TextView;
 
 import com.akexorcist.googledirection.DirectionCallback;
@@ -49,6 +50,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.gson.Gson;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -71,9 +73,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private TextView tvDurationDistance;
     private FloatingActionButton fabMyLocation;
     private FloatingActionButton fabDirection;
+    private ImageButton btnClose;
 
     private PlaceAutocompleteFragment autocompleteFragment;
     private Place searchedPlace;
+    private Geocoder geocoder;
 
     private BottomSheetBehavior bottomSheetDirection;
 
@@ -85,7 +89,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private TextToSpeech tts;
 
     private int i;
-    private double distance;
+    private double distanceToNext;
+    private double distanceToStart;
+    private double distanceStartNext;
+    private double angle;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -93,7 +100,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         setContentView(R.layout.activity_maps);
 
         tts = new TextToSpeech(this, this);
-        View btsDirections = findViewById(R.id.bottom_sheet_directions);
+        final View btsDirections = findViewById(R.id.bottom_sheet_directions);
         bottomSheetDirection = BottomSheetBehavior.from(btsDirections);
         bottomSheetDirection.setPeekHeight(0);
 
@@ -104,6 +111,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         fabDirection.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                btsDirections.setVisibility(View.VISIBLE);
                 bottomSheetDirection.setPeekHeight(100);
                 bottomSheetDirection.setState(BottomSheetBehavior.STATE_EXPANDED);
             }
@@ -111,6 +119,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         fabMyLocation = findViewById(R.id.fab_my_location);
         fabMyLocation.setOnClickListener(this);
+
+        btnClose = findViewById(R.id.btn_close);
+        btnClose.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                btsDirections.setVisibility(View.GONE);
+            }
+        });
+        geocoder = new Geocoder(this);
 
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
@@ -195,21 +212,75 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         distanceList.clear();
 
         mLastLatLng = new LatLng(location.getLatitude(), location.getLongitude());
-        for(i = 0; i < startLatLngList.size(); i++){
-            if(i == 0){
-                distance = CalculateDistance.calculateDistance(mLastLatLng, startLatLngList.get(i));
-            }else{
-                distance += CalculateDistance.calculateDistance(startLatLngList.get(i-1), startLatLngList.get(i));
+        if(startLatLngList.size() != 0 ){
+            List<Address> matches = null;
+            try {
+                matches = geocoder.getFromLocation(startLatLngList.get(0).latitude, startLatLngList.get(0).longitude, 1);
+                Address bestMatch = (matches.isEmpty() ? null : matches.get(0));
+
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            distanceList.add(distance);
-            Log.d("distance", String.valueOf(CalculateDistance.calculateDistance(mLastLatLng, startLatLngList.get(1))));
-        }
-        for(i = 0; i < distanceList.size(); i++){
-            if(distanceList.get(i) < 0.04){
-                tts.speak(String.valueOf(Html.fromHtml(directionList.get(i))), TextToSpeech.QUEUE_FLUSH, null);
-                passedLatLngList.add(startLatLngList.get(i));
-                directionList.remove(directionList.get(i));
-                startLatLngList.remove(startLatLngList.get(i));
+
+            distanceToStart = CalculateDistance.formatNumberDouble(CalculateDistance.calculateDistance(mLastLatLng, passedLatLngList.get(0)));
+            distanceToNext = CalculateDistance.formatNumberDouble(CalculateDistance.calculateDistance(mLastLatLng, startLatLngList.get(0)));
+            distanceStartNext = CalculateDistance.formatNumberDouble(CalculateDistance.calculateDistance(passedLatLngList.get(0), startLatLngList.get(0)));
+            angle = CalculateDistance.computeAngle(distanceToStart, distanceToNext, distanceStartNext);
+            Log.d("angle", String.valueOf(angle));
+            Log.d("distance", String.valueOf(distanceToNext));
+            if(angle > 150 || Double.isNaN(angle) || angle == 0.0){
+                if(distanceToNext < 0.02){
+                    Log.d("direction 1", String.valueOf(Html.fromHtml(directionList.get(0))));
+                    passedLatLngList.remove(passedLatLngList.get(0));
+                    passedLatLngList.add(startLatLngList.get(0));
+                    directionList.remove(directionList.get(0));
+                    startLatLngList.remove(startLatLngList.get(0));
+                }
+            } else {
+                directionList.clear();
+                startLatLngList.clear();
+                passedLatLngList.clear();
+                mMap.clear();
+                GoogleDirection.withServerKey(Constants.API_KEY)
+                        .from(mLastLatLng)
+                        .to(searchedPlace.getLatLng())
+                        .language("VI")
+                        .alternativeRoute(true)
+                        .transportMode(TransportMode.DRIVING)
+                        .execute(new DirectionCallback() {
+                            @Override
+                            public void onDirectionSuccess(Direction direction, String rawBody) {
+                                passedLatLngList.add(mLastLatLng);
+                                Route route = direction.getRouteList().get(0);
+                                Leg leg = route.getLegList().get(0);
+                                Info distanceInfo = leg.getDistance();
+                                Info durationInfo = leg.getDuration();
+                                String distance = distanceInfo.getText();
+                                String duration = durationInfo.getText();
+
+                                List<Step> stepList = leg.getStepList();
+                                for(Step step:stepList){
+                                    directionList.add(step.getHtmlInstruction());
+                                    startLatLngList.add(step.getStartLocation().getCoordination());
+                                }
+                                tvDurationDistance.setText(distance  + ", " + duration);
+                                rvDirections.setHasFixedSize(true);
+                                rvDirections.setLayoutManager(new LinearLayoutManager(getApplicationContext()));
+                                adapter = new StepAdapter(stepList);
+                                rvDirections.setAdapter(adapter);
+
+                                ArrayList<LatLng> directionPositionList = leg.getDirectionPoint();
+                                PolylineOptions polylineOptions = DirectionConverter.createPolyline(getApplicationContext(), directionPositionList, 5, Color.RED);
+                                mMap.addPolyline(polylineOptions);
+
+                                mMap.addMarker(new MarkerOptions().position(searchedPlace.getLatLng()));
+                            }
+
+                            @Override
+                            public void onDirectionFailure(Throwable t) {
+
+                            }
+                        });
             }
         }
     }
@@ -286,6 +357,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         .execute(new DirectionCallback() {
                             @Override
                             public void onDirectionSuccess(Direction direction, String rawBody) {
+                                passedLatLngList.add(mLastLatLng);
                                 Route route = direction.getRouteList().get(0);
                                 Leg leg = route.getLegList().get(0);
                                 Info distanceInfo = leg.getDistance();
@@ -298,8 +370,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                     directionList.add(step.getHtmlInstruction());
                                     startLatLngList.add(step.getStartLocation().getCoordination());
                                 }
-                                Log.d("old directionList", gson.toJson(directionList));
-                                Log.d("old startLatLngList", gson.toJson(startLatLngList));
                                 tvDurationDistance.setText(distance  + ", " + duration);
                                 rvDirections.setHasFixedSize(true);
                                 rvDirections.setLayoutManager(new LinearLayoutManager(getApplicationContext()));

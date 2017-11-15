@@ -138,7 +138,7 @@ public class CalculateDistance {
     public static double formatNumberDouble(double number) {
         if (number > 0) {
             double finalValue = 0;
-            finalValue = Math.round(number * 10.0) / 10.0;
+            finalValue = Math.round(number * 100.0) / 100.0;
             return finalValue;
         } else {
             return 0;

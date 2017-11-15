@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     tools:context="binary.maps.MapsActivity">
 
-    <FrameLayout
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
         <fragment
@@ -19,21 +19,55 @@
             android:id="@+id/place_autocomplete_fragment"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:name="com.google.android.gms.location.places.ui.PlaceAutocompleteFragment"
-            />
+            android:name="com.google.android.gms.location.places.ui.PlaceAutocompleteFragment" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/layout_direction"
+            android:orientation="horizontal"
+            android:background="#43A047"
+            android:layout_below="@+id/place_autocomplete_fragment"
+            android:visibility="">
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="image_direction"
+                android:src="@drawable/ic_go_straight"
+                android:layout_gravity="center"/>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:id="@+id/text_direction"
+                    android:textColor="@android:color/white"
+                    android:text="Rẽ phải"
+                    android:textSize="18dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:id="@+id/text_distance"/>
+            </LinearLayout>
+
+        </LinearLayout>
 
         <android.support.design.widget.FloatingActionButton
             android:elevation="4dp"
             android:id="@+id/fab_my_location"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="top|right"
-            android:layout_marginTop="60dp"
-            android:layout_marginRight="4dp"
             map:fabSize="mini"
             android:background="?android:attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentTop="true"
             android:src="@drawable/ic_my_location"
             app:backgroundTint="#FFFFFF" />
         <android.support.design.widget.FloatingActionButton
@@ -41,15 +75,16 @@
             android:id="@+id/fab_direction"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom|right"
-            android:layout_marginBottom="96dp"
-            android:layout_marginRight="8dp"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentRight="true"
+            android:layout_marginBottom="52dp"
+            android:layout_marginRight="4dp"
             android:background="?android:attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
             android:src="@drawable/ic_directions"
             app:backgroundTint="#FFFFFF" />
-    </FrameLayout>
+    </RelativeLayout>
 
     <include layout="@layout/bottom_sheet_direction" />
 </android.support.design.widget.CoordinatorLayout>
