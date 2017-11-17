@@ -3,6 +3,7 @@ package binary.maps;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
@@ -20,6 +21,7 @@ import android.text.Html;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.akexorcist.googledirection.DirectionCallback;
@@ -70,7 +72,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private StepAdapter adapter;
 
     private RecyclerView rvDirections;
+    private View layoutDirection;
     private TextView tvDurationDistance;
+    private TextView textDirection;
+    private TextView textDistance;
+    private ImageView imgDirection;
     private FloatingActionButton fabMyLocation;
     private FloatingActionButton fabDirection;
     private ImageButton btnClose;
@@ -84,7 +90,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private ArrayList<String> directionList = new ArrayList<>();
     private ArrayList<LatLng> startLatLngList = new ArrayList<>();
     private ArrayList<LatLng> passedLatLngList = new ArrayList<>();
-    private ArrayList<Double> distanceList = new ArrayList<>();
 
     private TextToSpeech tts;
 
@@ -101,13 +106,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         tts = new TextToSpeech(this, this);
         final View btsDirections = findViewById(R.id.bottom_sheet_directions);
+        layoutDirection = findViewById(R.id.layout_direction);
+        tvDurationDistance = findViewById(R.id.duration_distance);
+        rvDirections = findViewById(R.id.rvDirections);
+        fabDirection = findViewById(R.id.fab_direction);
+        fabMyLocation = findViewById(R.id.fab_my_location);
+        btnClose = findViewById(R.id.btn_close);
+        autocompleteFragment = (PlaceAutocompleteFragment)
+                getFragmentManager().findFragmentById(R.id.place_autocomplete_fragment);
+        textDirection = findViewById(R.id.text_direction);
+        textDistance = findViewById(R.id.text_distance);
+        imgDirection = findViewById(R.id.image_direction);
+
         bottomSheetDirection = BottomSheetBehavior.from(btsDirections);
         bottomSheetDirection.setPeekHeight(0);
 
-        tvDurationDistance = findViewById(R.id.duration_distance);
-        rvDirections = findViewById(R.id.rvDirections);
-
-        fabDirection = findViewById(R.id.fab_direction);
         fabDirection.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -117,10 +130,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         });
 
-        fabMyLocation = findViewById(R.id.fab_my_location);
         fabMyLocation.setOnClickListener(this);
 
-        btnClose = findViewById(R.id.btn_close);
         btnClose.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -136,8 +147,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .build();
         mGoogleApiClient.connect();
 
-        autocompleteFragment = (PlaceAutocompleteFragment)
-                getFragmentManager().findFragmentById(R.id.place_autocomplete_fragment);
         autocompleteFragment.getView().setBackgroundColor(Color.WHITE);
         findWay();
 
@@ -209,14 +218,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onLocationChanged(Location location) {
-        distanceList.clear();
-
         mLastLatLng = new LatLng(location.getLatitude(), location.getLongitude());
         if(startLatLngList.size() != 0 ){
             List<Address> matches = null;
             try {
                 matches = geocoder.getFromLocation(startLatLngList.get(0).latitude, startLatLngList.get(0).longitude, 1);
                 Address bestMatch = (matches.isEmpty() ? null : matches.get(0));
+                Log.d("name 1:", bestMatch.getAdminArea());
+                Log.d("name 1:", bestMatch.getSubAdminArea());
+                Log.d("name 1:", bestMatch.getLocality());
 
             } catch (IOException e) {
                 e.printStackTrace();
@@ -228,6 +238,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             angle = CalculateDistance.computeAngle(distanceToStart, distanceToNext, distanceStartNext);
             Log.d("angle", String.valueOf(angle));
             Log.d("distance", String.valueOf(distanceToNext));
+
+            if(distanceToNext < 0.1){
+                textDistance.setText(String.valueOf(distanceToNext*1000) + " m");
+            }else {
+                textDistance.setText(String.valueOf(distanceToNext) + " km");
+            }
+
             if(angle > 150 || Double.isNaN(angle) || angle == 0.0){
                 if(distanceToNext < 0.02){
                     Log.d("direction 1", String.valueOf(Html.fromHtml(directionList.get(0))));
@@ -235,6 +252,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     passedLatLngList.add(startLatLngList.get(0));
                     directionList.remove(directionList.get(0));
                     startLatLngList.remove(startLatLngList.get(0));
+
+                    setTextDirection();
                 }
             } else {
                 directionList.clear();
@@ -263,6 +282,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                     directionList.add(step.getHtmlInstruction());
                                     startLatLngList.add(step.getStartLocation().getCoordination());
                                 }
+                                setTextDirection();
+
                                 tvDurationDistance.setText(distance  + ", " + duration);
                                 rvDirections.setHasFixedSize(true);
                                 rvDirections.setLayoutManager(new LinearLayoutManager(getApplicationContext()));
@@ -357,6 +378,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         .execute(new DirectionCallback() {
                             @Override
                             public void onDirectionSuccess(Direction direction, String rawBody) {
+                                layoutDirection.setVisibility(View.VISIBLE);
                                 passedLatLngList.add(mLastLatLng);
                                 Route route = direction.getRouteList().get(0);
                                 Leg leg = route.getLegList().get(0);
@@ -370,6 +392,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                     directionList.add(step.getHtmlInstruction());
                                     startLatLngList.add(step.getStartLocation().getCoordination());
                                 }
+                                setTextDirection();
+
                                 tvDurationDistance.setText(distance  + ", " + duration);
                                 rvDirections.setHasFixedSize(true);
                                 rvDirections.setLayoutManager(new LinearLayoutManager(getApplicationContext()));
@@ -397,5 +421,26 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         });
 
+    }
+
+    public void setTextDirection(){
+        textDirection.setText(directionList.get(0));
+        if(directionList.get(0).contains("Rẽ phải")){
+            imgDirection.setImageResource(R.drawable.ic_turn_right);
+        }else if(directionList.get(0).contains("Rẽ trái")){
+            imgDirection.setImageResource(R.drawable.ic_turn_left);
+        }else if(directionList.get(0).contains("Vòng ngược lại")){
+            imgDirection.setImageResource(R.drawable.ic_turn_around);
+        }else if(directionList.get(0).contains("vòng xuyến")) {
+            imgDirection.setImageResource(R.drawable.ic_roundabout);
+        }else if(directionList.get(0).contains("Chếch sang phải")){
+            imgDirection.setImageResource(R.drawable.ic_slight_right);
+        }else if(directionList.get(0).contains("Chếch sang trái")){
+            imgDirection.setImageResource(R.drawable.ic_slight_left);
+        }else if(directionList.get(0).contains("lối ra")){
+            imgDirection.setImageResource(R.drawable.ic_exit);
+        }else {
+            imgDirection.setImageResource(R.drawable.ic_go_straight);
+        }
     }
 }

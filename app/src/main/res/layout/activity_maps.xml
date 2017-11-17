@@ -23,37 +23,41 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="56dp"
             android:id="@+id/layout_direction"
             android:orientation="horizontal"
             android:background="#43A047"
             android:layout_below="@+id/place_autocomplete_fragment"
-            android:visibility="">
+            android:visibility="visible">
 
-            <ImageView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:id="image_direction"
-                android:src="@drawable/ic_go_straight"
-                android:layout_gravity="center"/>
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:id="@+id/text_direction"
-                    android:textColor="@android:color/white"
-                    android:text="Rẽ phải"
-                    android:textSize="18dp"/>
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:id="@+id/image_direction"
+                    android:src="@drawable/ic_go_straight"
+                    android:layout_gravity="center_horizontal"/>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:id="@+id/text_distance"/>
+                    android:id="@+id/text_distance"
+                    android:layout_gravity="center_horizontal"/>
             </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/text_direction"
+                android:textColor="@android:color/white"
+                android:text="Rẽ phải"
+                android:layout_marginLeft="20dp"
+                android:maxLines="2"
+                android:textSize="18dp"/>
 
         </LinearLayout>
 
@@ -66,8 +70,8 @@
             android:background="?android:attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
+            android:layout_below="@+id/layout_direction"
             android:layout_alignParentRight="true"
-            android:layout_alignParentTop="true"
             android:src="@drawable/ic_my_location"
             app:backgroundTint="#FFFFFF" />
         <android.support.design.widget.FloatingActionButton
