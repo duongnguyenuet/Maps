@@ -3,9 +3,7 @@ package binary.maps;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.graphics.drawable.Drawable;
-import android.location.Address;
-import android.location.Geocoder;
+
 import android.location.Location;
 import android.speech.tts.TextToSpeech;
 import android.support.annotation.NonNull;
@@ -23,6 +21,7 @@ import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.akexorcist.googledirection.DirectionCallback;
 import com.akexorcist.googledirection.GoogleDirection;
@@ -52,7 +51,6 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.gson.Gson;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -83,7 +81,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private PlaceAutocompleteFragment autocompleteFragment;
     private Place searchedPlace;
-    private Geocoder geocoder;
 
     private BottomSheetBehavior bottomSheetDirection;
 
@@ -138,7 +135,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 btsDirections.setVisibility(View.GONE);
             }
         });
-        geocoder = new Geocoder(this);
 
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
@@ -146,6 +142,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .addApi(LocationServices.API)
                 .build();
         mGoogleApiClient.connect();
+
 
         autocompleteFragment.getView().setBackgroundColor(Color.WHITE);
         findWay();
@@ -170,14 +167,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap = googleMap;
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-            return;
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION},1);
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},1);
         }
         mMap.setMyLocationEnabled(true);
         mMap.getUiSettings().setMyLocationButtonEnabled(false);
@@ -208,30 +199,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onConnectionSuspended(int i) {
-
+        Toast.makeText(this, "Connection Suspended", Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-
+        Toast.makeText(this, connectionResult.getErrorMessage(), Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onLocationChanged(Location location) {
         mLastLatLng = new LatLng(location.getLatitude(), location.getLongitude());
         if(startLatLngList.size() != 0 ){
-            List<Address> matches = null;
-            try {
-                matches = geocoder.getFromLocation(startLatLngList.get(0).latitude, startLatLngList.get(0).longitude, 1);
-                Address bestMatch = (matches.isEmpty() ? null : matches.get(0));
-                Log.d("name 1:", bestMatch.getAdminArea());
-                Log.d("name 1:", bestMatch.getSubAdminArea());
-                Log.d("name 1:", bestMatch.getLocality());
-
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
             distanceToStart = CalculateDistance.formatNumberDouble(CalculateDistance.calculateDistance(mLastLatLng, passedLatLngList.get(0)));
             distanceToNext = CalculateDistance.formatNumberDouble(CalculateDistance.calculateDistance(mLastLatLng, startLatLngList.get(0)));
             distanceStartNext = CalculateDistance.formatNumberDouble(CalculateDistance.calculateDistance(passedLatLngList.get(0), startLatLngList.get(0)));
@@ -246,7 +225,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
 
             if(angle > 150 || Double.isNaN(angle) || angle == 0.0){
-                if(distanceToNext < 0.02){
+                if(distanceToNext < 0.01){
                     Log.d("direction 1", String.valueOf(Html.fromHtml(directionList.get(0))));
                     passedLatLngList.remove(passedLatLngList.get(0));
                     passedLatLngList.add(startLatLngList.get(0));
@@ -424,7 +403,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     public void setTextDirection(){
-        textDirection.setText(directionList.get(0));
+        textDirection.setText(Html.fromHtml(directionList.get(0)));
         if(directionList.get(0).contains("Rẽ phải")){
             imgDirection.setImageResource(R.drawable.ic_turn_right);
         }else if(directionList.get(0).contains("Rẽ trái")){
