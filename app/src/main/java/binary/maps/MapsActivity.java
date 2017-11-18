@@ -215,7 +215,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             distanceToNext = CalculateDistance.formatNumberDouble(CalculateDistance.calculateDistance(mLastLatLng, startLatLngList.get(0)));
             distanceStartNext = CalculateDistance.formatNumberDouble(CalculateDistance.calculateDistance(passedLatLngList.get(0), startLatLngList.get(0)));
             angle = CalculateDistance.computeAngle(distanceToStart, distanceToNext, distanceStartNext);
-            Log.d("angle", String.valueOf(angle));
+            Log.d("D", String.valueOf(angle));
             Log.d("distance", String.valueOf(distanceToNext));
 
             if(distanceToNext < 0.1){
@@ -272,7 +272,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 ArrayList<LatLng> directionPositionList = leg.getDirectionPoint();
                                 PolylineOptions polylineOptions = DirectionConverter.createPolyline(getApplicationContext(), directionPositionList, 5, Color.RED);
                                 mMap.addPolyline(polylineOptions);
-
                                 mMap.addMarker(new MarkerOptions().position(searchedPlace.getLatLng()));
                             }
 
@@ -397,7 +396,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 ArrayList<LatLng> directionPositionList = leg.getDirectionPoint();
                                 PolylineOptions polylineOptions = DirectionConverter.createPolyline(getApplicationContext(), directionPositionList, 5, Color.RED);
                                 mMap.addPolyline(polylineOptions);
-
                                 mMap.addMarker(new MarkerOptions().position(place.getLatLng()));
                                 moveToLocation(place.getLatLng());
                             }
@@ -449,51 +447,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @SuppressLint("MissingPermission")
     public void getFirstLocation(){
-        Location lastLocation = null;
+        Location lastLocation;
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
-        // getting GPS status
-        boolean isGPSEnabled = locationManager
-                .isProviderEnabled(LocationManager.GPS_PROVIDER);
-
-        // getting network status
-        boolean isNetworkEnabled = locationManager
-                .isProviderEnabled(LocationManager.NETWORK_PROVIDER);
-
-        if (!isGPSEnabled && !isNetworkEnabled) {
-            // no network provider is enabled
-        } else {
-            if (isNetworkEnabled) {
-                locationManager.requestLocationUpdates(
-                        LocationManager.NETWORK_PROVIDER,
-                        MIN_TIME_BW_UPDATES,
-                        MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
-                Log.d("Network", "Network Enabled");
-                if (locationManager != null) {
-                    lastLocation = locationManager
-                            .getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-                    if (lastLocation != null) {
-                        mLastLatLng = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
-                    }
-                }
-            }
-            // if GPS Enabled get lat/long using GPS Services
-            if (isGPSEnabled) {
-                if (lastLocation == null) {
-                    locationManager.requestLocationUpdates(
-                            LocationManager.GPS_PROVIDER,
-                            MIN_TIME_BW_UPDATES,
-                            MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
-                    Log.d("GPS", "GPS Enabled");
-                    if (locationManager != null) {
-                        lastLocation = locationManager
-                                .getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                        if (lastLocation != null) {
-                            mLastLatLng = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
-                        }
-                    }
-                }
-            }
+        if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 3000, 10, this);
+            lastLocation = locationManager
+                    .getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            mLastLatLng = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
+        } else if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 3000, 10, this);
+            lastLocation = locationManager
+                    .getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            mLastLatLng = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
         }
     }
 }
