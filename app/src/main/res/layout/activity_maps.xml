@@ -36,8 +36,8 @@
                 android:orientation="vertical">
 
                 <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
                     android:id="@+id/image_direction"
                     android:src="@drawable/ic_go_straight"
                     android:layout_gravity="center_horizontal"/>
@@ -47,6 +47,9 @@
                     android:layout_height="wrap_content"
                     android:id="@+id/text_distance"
                     android:textStyle="bold"
+                    android:text="10m"
+                    android:layout_marginLeft="2dp"
+                    android:layout_marginBottom="2dp"
                     android:textColor="@android:color/white"
                     android:layout_gravity="center_horizontal"/>
             </LinearLayout>

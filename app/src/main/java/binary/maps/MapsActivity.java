@@ -1,10 +1,13 @@
 package binary.maps;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 
 import android.location.Location;
+import android.location.LocationManager;
 import android.speech.tts.TextToSpeech;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -59,10 +62,14 @@ import binary.maps.adapter.StepAdapter;
 import binary.maps.utils.CalculateDistance;
 import binary.maps.utils.Constants;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener,LocationListener, View.OnClickListener, TextToSpeech.OnInitListener {
+import static binary.maps.utils.Constants.MIN_DISTANCE_CHANGE_FOR_UPDATES;
+import static binary.maps.utils.Constants.MIN_TIME_BW_UPDATES;
+
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, android.location.LocationListener, View.OnClickListener, TextToSpeech.OnInitListener {
     private GoogleMap mMap;
     private GoogleApiClient mGoogleApiClient;
     private LocationRequest mLocationRequest;
+    private LocationManager locationManager;
     private LatLng mLastLatLng;
 
     private Gson gson = new Gson();
@@ -114,6 +121,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         textDirection = findViewById(R.id.text_direction);
         textDistance = findViewById(R.id.text_distance);
         imgDirection = findViewById(R.id.image_direction);
+
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         bottomSheetDirection = BottomSheetBehavior.from(btsDirections);
         bottomSheetDirection.setPeekHeight(0);
@@ -184,10 +193,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION},1);
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},1);
         }
-        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-
-        Location lastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-        mLastLatLng = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
+        getFirstLocation();
         moveToLocation(mLastLatLng);
     }
 
@@ -280,15 +286,30 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+
+    }
+
+    @Override
+    public void onProviderEnabled(String provider) {
+        Toast.makeText(getApplicationContext(), "GSP Enabled", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
+        Toast.makeText(getApplicationContext(), "GSP Disabled", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
-        mGoogleApiClient.connect();
+//        mGoogleApiClient.connect();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        mGoogleApiClient.disconnect();
+        locationManager.removeUpdates(this);
     }
 
     private void moveToLocation(LatLng latLng) {
@@ -397,23 +418,82 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     public void setTextDirection(){
+        distanceToNext = CalculateDistance.formatNumberDouble(CalculateDistance.calculateDistance(mLastLatLng, startLatLngList.get(0)));
+        if(distanceToNext < 0.1){
+            textDistance.setText(String.valueOf(distanceToNext*1000) + " m");
+        }else {
+            textDistance.setText(String.valueOf(distanceToNext) + " km");
+        }
+
+        String direction = String.valueOf(Html.fromHtml(directionList.get(0)));
         textDirection.setText(Html.fromHtml(directionList.get(0)));
-        if(directionList.get(0).contains("Rẽ phải")){
+
+        if(direction.contains("Rẽ phải")){
             imgDirection.setImageResource(R.drawable.ic_turn_right);
-        }else if(directionList.get(0).contains("Rẽ trái")){
+        }else if(direction.contains("Rẽ trái")){
             imgDirection.setImageResource(R.drawable.ic_turn_left);
-        }else if(directionList.get(0).contains("Vòng ngược lại")){
+        }else if(direction.contains("Vòng ngược lại")){
             imgDirection.setImageResource(R.drawable.ic_turn_around);
-        }else if(directionList.get(0).contains("vòng xuyến")) {
+        }else if(direction.contains("vòng xuyến")) {
             imgDirection.setImageResource(R.drawable.ic_roundabout);
-        }else if(directionList.get(0).contains("Chếch sang phải")){
+        }else if(direction.contains("Chếch sang phải")){
             imgDirection.setImageResource(R.drawable.ic_slight_right);
-        }else if(directionList.get(0).contains("Chếch sang trái")){
+        }else if(direction.contains("Chếch sang trái")){
             imgDirection.setImageResource(R.drawable.ic_slight_left);
-        }else if(directionList.get(0).contains("lối ra")){
+        }else if(direction.contains("lối ra")){
             imgDirection.setImageResource(R.drawable.ic_exit);
         }else {
             imgDirection.setImageResource(R.drawable.ic_go_straight);
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    public void getFirstLocation(){
+        Location lastLocation = null;
+        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+
+        // getting GPS status
+        boolean isGPSEnabled = locationManager
+                .isProviderEnabled(LocationManager.GPS_PROVIDER);
+
+        // getting network status
+        boolean isNetworkEnabled = locationManager
+                .isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+
+        if (!isGPSEnabled && !isNetworkEnabled) {
+            // no network provider is enabled
+        } else {
+            if (isNetworkEnabled) {
+                locationManager.requestLocationUpdates(
+                        LocationManager.NETWORK_PROVIDER,
+                        MIN_TIME_BW_UPDATES,
+                        MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
+                Log.d("Network", "Network Enabled");
+                if (locationManager != null) {
+                    lastLocation = locationManager
+                            .getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                    if (lastLocation != null) {
+                        mLastLatLng = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
+                    }
+                }
+            }
+            // if GPS Enabled get lat/long using GPS Services
+            if (isGPSEnabled) {
+                if (lastLocation == null) {
+                    locationManager.requestLocationUpdates(
+                            LocationManager.GPS_PROVIDER,
+                            MIN_TIME_BW_UPDATES,
+                            MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
+                    Log.d("GPS", "GPS Enabled");
+                    if (locationManager != null) {
+                        lastLocation = locationManager
+                                .getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                        if (lastLocation != null) {
+                            mLastLatLng = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
+                        }
+                    }
+                }
+            }
         }
     }
 }
