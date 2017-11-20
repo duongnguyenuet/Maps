@@ -53,6 +53,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.gson.Gson;
+import com.google.maps.android.PolyUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,7 +66,7 @@ import binary.maps.utils.Constants;
 import static binary.maps.utils.Constants.MIN_DISTANCE_CHANGE_FOR_UPDATES;
 import static binary.maps.utils.Constants.MIN_TIME_BW_UPDATES;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, android.location.LocationListener, View.OnClickListener, TextToSpeech.OnInitListener {
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener,android.location.LocationListener, LocationListener, View.OnClickListener, TextToSpeech.OnInitListener {
     private GoogleMap mMap;
     private GoogleApiClient mGoogleApiClient;
     private LocationRequest mLocationRequest;
@@ -94,14 +95,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private ArrayList<String> directionList = new ArrayList<>();
     private ArrayList<LatLng> startLatLngList = new ArrayList<>();
     private ArrayList<LatLng> passedLatLngList = new ArrayList<>();
+    private List<LatLng> polyLineList;
 
     private TextToSpeech tts;
 
     private int i;
     private double distanceToNext;
-    private double distanceToStart;
-    private double distanceStartNext;
-    private double angle;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -176,8 +175,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap = googleMap;
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION},1);
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},1);
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
         }
         mMap.setMyLocationEnabled(true);
         mMap.getUiSettings().setMyLocationButtonEnabled(false);
@@ -190,10 +189,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mLocationRequest.setInterval(10);
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION},1);
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},1);
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
         }
-        getFirstLocation();
+        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
+
+        Location lastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+        mLastLatLng = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
         moveToLocation(mLastLatLng);
     }
 
@@ -210,22 +212,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onLocationChanged(Location location) {
         mLastLatLng = new LatLng(location.getLatitude(), location.getLongitude());
-        if(startLatLngList.size() != 0 ){
-            distanceToStart = CalculateDistance.formatNumberDouble(CalculateDistance.calculateDistance(mLastLatLng, passedLatLngList.get(0)));
+        if (startLatLngList.size() != 0) {
             distanceToNext = CalculateDistance.formatNumberDouble(CalculateDistance.calculateDistance(mLastLatLng, startLatLngList.get(0)));
-            distanceStartNext = CalculateDistance.formatNumberDouble(CalculateDistance.calculateDistance(passedLatLngList.get(0), startLatLngList.get(0)));
-            angle = CalculateDistance.computeAngle(distanceToStart, distanceToNext, distanceStartNext);
-            Log.d("D", String.valueOf(angle));
-            Log.d("distance", String.valueOf(distanceToNext));
 
-            if(distanceToNext < 0.1){
-                textDistance.setText(String.valueOf(distanceToNext*1000) + " m");
-            }else {
+            if (distanceToNext < 0.1) {
+                textDistance.setText(String.valueOf(distanceToNext * 1000) + " m");
+            } else {
                 textDistance.setText(String.valueOf(distanceToNext) + " km");
             }
 
-            if(angle > 150 || Double.isNaN(angle) || angle == 0.0){
-                if(distanceToNext < 0.01){
+            if (PolyUtil.isLocationOnPath(mLastLatLng, polyLineList, true, 10)) {
+                if (distanceToNext < 0.01) {
                     Log.d("direction 1", String.valueOf(Html.fromHtml(directionList.get(0))));
                     passedLatLngList.remove(passedLatLngList.get(0));
                     passedLatLngList.add(startLatLngList.get(0));
@@ -238,6 +235,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 directionList.clear();
                 startLatLngList.clear();
                 passedLatLngList.clear();
+                polyLineList.clear();
                 mMap.clear();
                 GoogleDirection.withServerKey(Constants.API_KEY)
                         .from(mLastLatLng)
@@ -257,13 +255,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 String duration = durationInfo.getText();
 
                                 List<Step> stepList = leg.getStepList();
-                                for(Step step:stepList){
+                                for (Step step : stepList) {
                                     directionList.add(step.getHtmlInstruction());
                                     startLatLngList.add(step.getStartLocation().getCoordination());
                                 }
                                 setTextDirection();
 
-                                tvDurationDistance.setText(distance  + ", " + duration);
+                                tvDurationDistance.setText(distance + ", " + duration);
                                 rvDirections.setHasFixedSize(true);
                                 rvDirections.setLayoutManager(new LinearLayoutManager(getApplicationContext()));
                                 adapter = new StepAdapter(stepList);
@@ -271,6 +269,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                                 ArrayList<LatLng> directionPositionList = leg.getDirectionPoint();
                                 PolylineOptions polylineOptions = DirectionConverter.createPolyline(getApplicationContext(), directionPositionList, 5, Color.RED);
+                                polyLineList = polylineOptions.getPoints();
                                 mMap.addPolyline(polylineOptions);
                                 mMap.addMarker(new MarkerOptions().position(searchedPlace.getLatLng()));
                             }
@@ -286,17 +285,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onStatusChanged(String provider, int status, Bundle extras) {
-
+        Log.e("LocationListener", "onStatusChanged");
     }
 
     @Override
     public void onProviderEnabled(String provider) {
-        Toast.makeText(getApplicationContext(), "GSP Enabled", Toast.LENGTH_SHORT).show();
+        Log.e("LocationListener", "onProviderEnabled");
     }
 
     @Override
     public void onProviderDisabled(String provider) {
-        Toast.makeText(getApplicationContext(), "GSP Disabled", Toast.LENGTH_SHORT).show();
+        Log.e("LocationListener", "onProviderDisabled");
     }
 
     @Override
@@ -354,7 +353,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-    public void findWay(){
+    public void findWay() {
         autocompleteFragment.setOnPlaceSelectedListener(new PlaceSelectionListener() {
             @Override
             public void onPlaceSelected(final Place place) {
@@ -381,13 +380,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 String duration = durationInfo.getText();
 
                                 List<Step> stepList = leg.getStepList();
-                                for(Step step:stepList){
+                                for (Step step : stepList) {
                                     directionList.add(step.getHtmlInstruction());
                                     startLatLngList.add(step.getStartLocation().getCoordination());
                                 }
                                 setTextDirection();
 
-                                tvDurationDistance.setText(distance  + ", " + duration);
+                                tvDurationDistance.setText(distance + ", " + duration);
                                 rvDirections.setHasFixedSize(true);
                                 rvDirections.setLayoutManager(new LinearLayoutManager(getApplicationContext()));
                                 adapter = new StepAdapter(stepList);
@@ -395,6 +394,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                                 ArrayList<LatLng> directionPositionList = leg.getDirectionPoint();
                                 PolylineOptions polylineOptions = DirectionConverter.createPolyline(getApplicationContext(), directionPositionList, 5, Color.RED);
+                                polyLineList = polylineOptions.getPoints();
                                 mMap.addPolyline(polylineOptions);
                                 mMap.addMarker(new MarkerOptions().position(place.getLatLng()));
                                 moveToLocation(place.getLatLng());
@@ -415,51 +415,33 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
-    public void setTextDirection(){
+    public void setTextDirection() {
         distanceToNext = CalculateDistance.formatNumberDouble(CalculateDistance.calculateDistance(mLastLatLng, startLatLngList.get(0)));
-        if(distanceToNext < 0.1){
-            textDistance.setText(String.valueOf(distanceToNext*1000) + " m");
-        }else {
+        if (distanceToNext < 0.1) {
+            textDistance.setText(String.valueOf(distanceToNext * 1000) + " m");
+        } else {
             textDistance.setText(String.valueOf(distanceToNext) + " km");
         }
 
         String direction = String.valueOf(Html.fromHtml(directionList.get(0)));
         textDirection.setText(Html.fromHtml(directionList.get(0)));
 
-        if(direction.contains("Rẽ phải")){
+        if (direction.contains("Rẽ phải")) {
             imgDirection.setImageResource(R.drawable.ic_turn_right);
-        }else if(direction.contains("Rẽ trái")){
+        } else if (direction.contains("Rẽ trái")) {
             imgDirection.setImageResource(R.drawable.ic_turn_left);
-        }else if(direction.contains("Vòng ngược lại")){
+        } else if (direction.contains("Vòng ngược lại")) {
             imgDirection.setImageResource(R.drawable.ic_turn_around);
-        }else if(direction.contains("vòng xuyến")) {
+        } else if (direction.contains("vòng xuyến")) {
             imgDirection.setImageResource(R.drawable.ic_roundabout);
-        }else if(direction.contains("Chếch sang phải")){
+        } else if (direction.contains("Chếch sang phải")) {
             imgDirection.setImageResource(R.drawable.ic_slight_right);
-        }else if(direction.contains("Chếch sang trái")){
+        } else if (direction.contains("Chếch sang trái")) {
             imgDirection.setImageResource(R.drawable.ic_slight_left);
-        }else if(direction.contains("lối ra")){
+        } else if (direction.contains("lối ra")) {
             imgDirection.setImageResource(R.drawable.ic_exit);
-        }else {
+        } else {
             imgDirection.setImageResource(R.drawable.ic_go_straight);
-        }
-    }
-
-    @SuppressLint("MissingPermission")
-    public void getFirstLocation(){
-        Location lastLocation;
-        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-
-        if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 3000, 10, this);
-            lastLocation = locationManager
-                    .getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            mLastLatLng = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
-        } else if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 3000, 10, this);
-            lastLocation = locationManager
-                    .getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            mLastLatLng = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
         }
     }
 }
