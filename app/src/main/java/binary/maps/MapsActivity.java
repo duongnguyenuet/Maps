@@ -3,6 +3,7 @@ package binary.maps;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 
@@ -224,6 +225,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             if (PolyUtil.isLocationOnPath(mLastLatLng, polyLineList, true, 10)) {
                 if (distanceToNext < 0.01) {
                     Log.d("direction 1", String.valueOf(Html.fromHtml(directionList.get(0))));
+                    tts.speak(String.valueOf(Html.fromHtml(directionList.get(0))), TextToSpeech.QUEUE_FLUSH, null);
                     passedLatLngList.remove(passedLatLngList.get(0));
                     passedLatLngList.add(startLatLngList.get(0));
                     directionList.remove(directionList.get(0));
@@ -339,14 +341,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onInit(int status) {
-
         if (status == TextToSpeech.SUCCESS) {
-
-            int result = tts.setLanguage(Locale.getDefault());
-
-            if (result == TextToSpeech.LANG_MISSING_DATA
-                    || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+            Locale locale = new Locale("vi");
+            int result = tts.setLanguage(locale);
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                 Log.e("TTS", "This Language is not supported");
+                Intent installIntent = new Intent();
+                installIntent.setAction(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA);
+                startActivity(installIntent);
             }
         } else {
             Log.e("TTS", "Initilization Failed!");
